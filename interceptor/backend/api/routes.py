@@ -12,6 +12,7 @@ from core.proxy_server import EnhancedProxyEngine
 from models.database import DatabaseManager
 from modules.replay_forge.api import router as replay_forge_router
 from modules.portal.api import router as portal_router
+from modules.raider.api import router as raider_router
 
 def create_api_app(proxy_engine: EnhancedProxyEngine, db_manager: DatabaseManager):
     """Factory function to create the main FastAPI app and attach routers."""
@@ -68,6 +69,7 @@ def create_api_app(proxy_engine: EnhancedProxyEngine, db_manager: DatabaseManage
     app.include_router(proxy_router)
     app.include_router(replay_forge_router)
     app.include_router(portal_router)
+    app.include_router(raider_router)
 
     # --- Placeholder for future module routers ---
     # As we build Replay Forge, Portal, etc., we will create their API routers
