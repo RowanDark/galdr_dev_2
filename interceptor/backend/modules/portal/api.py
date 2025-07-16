@@ -1,30 +1,43 @@
 # galdr/interceptor/backend/modules/portal/api.py
-# All API endpoints related to the Portal module.
+# --- UPDATED ---
+# We are upgrading the Pydantic model to optionally accept a context dictionary.
 
 from fastapi import APIRouter
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+from typing import Dict, Any, Optional
+
 from .engine import PortalEngine
 from models.database import DatabaseManager
+
+# UPDATED: This model now includes an optional 'context' field.
 class UserMessage(BaseModel):
-content: str
+    content: str
+    context: Optional[Dict[str, Any]] = None # The context from the originating Galdr module
 
 # This router will be imported and included in the main FastAPI app.
 router = APIRouter(prefix="/api/portal", tags=["Portal AI"])
 engine = PortalEngine(db_manager=DatabaseManager())
+
+# --- No changes to the GET endpoints ---
 @router.get("/conversations", status_code=200)
 async def get_conversations():
-"""Get a list of all past conversations."""
-return engine.get_all_conversations()
+    return engine.get_all_conversations()
+
 @router.post("/conversations", status_code=201)
 async def create_new_conversation():
-"""Starts a new, empty conversation."""
-return engine.start_conversation()
+    return engine.start_conversation()
+
 @router.get("/conversations/{conversation_id}/messages", status_code=200)
 async def get_messages(conversation_id: str):
-"""Get all messages for a specific conversation."""
-return engine.get_conversation_messages(conversation_id)
+    return engine.get_conversation_messages(conversation_id)
+
+# UPDATED: This endpoint now accepts the context object.
 @router.post("/conversations/{conversation_id}/messages", status_code=201)
 async def post_message_to_conversation(conversation_id: str, message: UserMessage):
-"""Submits a user message to a conversation and gets an AI response."""
-assistant_response = await engine.submit_message(conversation_id, message.content)
-return assistant_response
+    """Submits a user message and optional context to a conversation."""
+    assistant_response = await engine.submit_message(
+        conversation_id, 
+        message.content, 
+        message.context # Pass the context to the engine
+    )
+    return assistant_response
