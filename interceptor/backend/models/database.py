@@ -15,6 +15,7 @@ from sqlalchemy.orm import sessionmaker, relationship, declarative_base
 import logging
 from modules.replay_forge.models import Base as ReplayForgeBase
 from modules.portal.models import Base as PortalBase
+from modules.raider.models import Base as RaiderBase
 
 Base = declarative_base()
 
