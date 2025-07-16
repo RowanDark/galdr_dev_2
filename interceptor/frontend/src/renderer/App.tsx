@@ -9,6 +9,8 @@ import { Sidebar } from './components/Sidebar';
 import { Dashboard } from './components/Dashboard';
 import { TrafficViewer } from './components/TrafficViewer';
 import { ReplayForge } from './components/replay_forge/ReplayForge';
+import { Portal } from './components/portal/Portal';
+import { Raider } from './components/raider/Raider';
 
 // Services
 import { proxyManager } from './services/ProxyManager';
@@ -95,6 +97,15 @@ export const App: React.FC = () => {
       case 'replay_forge':
         // The ReplayForge component receives the request data via props.
         return <ReplayForge initialRequest={requestToSend} />;
+     
+      case 'portal':
+        return <Portal />;
+
+      // ADD THIS CASE
+      case 'raider':
+        return <Raider />;
+        
+      default:
       
       // We will add other views here as we build them.
       
