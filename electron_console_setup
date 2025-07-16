@@ -11,3 +11,6 @@ npm run build
 
 # Build Electron app
 npm run build:electron
+
+# Install React-Markdown
+npm install react-markdown
