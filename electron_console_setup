@@ -1,0 +1,13 @@
+RUN THIS IN TERMINAL FOR DEVELOPMENT SETUP & PRODUCTION BUILD
+
+# Install dependencies
+npm install
+
+# Start development server
+npm run dev
+
+# Build for production
+npm run build
+
+# Build Electron app
+npm run build:electron
