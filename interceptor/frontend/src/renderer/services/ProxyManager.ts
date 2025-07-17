@@ -8,6 +8,20 @@ import { InterceptedTraffic, ProxyStatus } from '../types/traffic'; // Assuming 
 
 const API_BASE_URL = 'http://localhost:8000';
 
+// NEW: Define the structure for a Raider result event
+export interface RaiderResultEvent {
+    attack_id: string;
+    request_number: number;
+    payload: string;
+    status: number;
+    length: number;
+    duration: number;
+}
+export interface RaiderStatusEvent {
+    attack_id: string;
+    status: 'completed' | 'stopped' | 'error';
+}
+
 class ProxyManager {
   private socket: Socket;
 
@@ -15,6 +29,8 @@ class ProxyManager {
   public onStatusUpdate: ((status: ProxyStatus) => void) | null = null;
   public onNewTraffic: ((traffic: InterceptedTraffic) => void) | null = null;
   public onError: ((error: string) => void) | null = null;
+  public onRaiderResult: ((result: RaiderResultEvent) => void) | null = null;
+  public onRaiderStatus: ((status: RaiderStatusEvent) => void) | null = null;
 
   constructor() {
     this.socket = io(API_BASE_URL, {
@@ -50,7 +66,16 @@ class ProxyManager {
     this.socket.on('new_traffic', (data: InterceptedTraffic) => {
       if (this.onNewTraffic) this.onNewTraffic(data);
     });
+     // NEW: Listen for events from the Raider module and pass to the handler
+    this.socket.on('raider_result_update', (data: RaiderResultEvent) => {
+        if (this.onRaiderResult) this.onRaiderResult(data);
+    });
+    
+    this.socket.on('raider_attack_status', (data: RaiderStatusEvent) => {
+        if (this.onRaiderStatus) this.onRaiderStatus(data);
+    });
   }
+  
 
   // --- API Methods ---
 
@@ -89,99 +114,4 @@ class ProxyManager {
 }
 
 // Export a singleton instance
-export const proxyManager = new ProxyManager();```
-
-**File:** `galdr/interceptor/frontend/src/renderer/App.tsx`
-```tsx
-// galdr/interceptor/frontend/src/renderer/App.tsx
-// --- REFACTORED ---
-// Removed `Cartographer` and `ReplayForge` components.
-// Simplified state management and now uses the singleton `proxyManager`.
-
-import React, { useState, useEffect } from 'react';
-import { Sidebar } from './components/Sidebar';
-import { Dashboard } from './components/Dashboard';
-import { TrafficViewer } from './components/TrafficViewer';
-// We will add the real ReplayForge component back here when we build it
-// import { ReplayForge } from './components/ReplayForge'; 
-import { Recon } from './components/Recon';
-import { PassiveCrawler } from './components/PassiveCrawler';
-import { ActiveSpider } from './components/ActiveSpider';
-import { Configuration } from './components/Configuration';
-
-// Service managers
-import { proxyManager } from './services/ProxyManager';
-// ... import other managers
-
-import { InterceptedTraffic, ProxyStatus } from './types/traffic';
-
-// Define the available views. Note the removal of the hallucinated modules.
-type ViewType = 'dashboard' | 'traffic' | 'recon' | 'crawler' | 'spider' | 'replay_forge' | 'config';
-
-export const App: React.FC = () => {
-  const [currentView, setCurrentView] = useState<ViewType>('dashboard');
-  const [traffic, setTraffic] = useState<InterceptedTraffic[]>([]);
-  const [selectedRequest, setSelectedRequest] = useState<InterceptedTraffic | null>(null);
-  const [proxyStatus, setProxyStatus] = useState<ProxyStatus>('stopped');
-
-  useEffect(() => {
-    // --- Setup Event Handlers for ProxyManager ---
-    proxyManager.onStatusUpdate = (status) => setProxyStatus(status);
-    proxyManager.onNewTraffic = (newTraffic) => {
-        // We add new traffic to the top of the list for a real-time feel
-        setTraffic(prev => [newTraffic, ...prev.slice(0, 999)]);
-    };
-    proxyManager.onError = (error) => console.error("Backend Error:", error);
-
-    // Load initial traffic data when the component mounts
-    proxyManager.getInitialTraffic()
-        .then(initialTraffic => setTraffic(initialTraffic))
-        .catch(err => console.error("Could not load initial traffic:", err));
-    
-    // Cleanup on unmount
-    return () => {
-      proxyManager.disconnect();
-    };
-  }, []); // Empty dependency array ensures this runs only once on mount
-
-  const handleStartProxy = () => proxyManager.startProxy().catch(console.error);
-  const handleStopProxy = () => proxyManager.stopProxy().catch(console.error);
-
-  const handleClearTraffic = async () => {
-    try {
-        await proxyManager.clearTraffic();
-        setTraffic([]);
-        setSelectedRequest(null);
-    } catch(err) {
-        console.error("Failed to clear traffic:", err);
-    }
-  };
-
-  const renderCurrentView = () => {
-    switch (currentView) {
-      case 'dashboard':
-        return <Dashboard proxyStatus={proxyStatus} onStartProxy={handleStartProxy} onStopProxy={handleStopProxy} trafficCount={traffic.length} />;
-      case 'traffic':
-        return <TrafficViewer traffic={traffic} selectedRequest={selectedRequest} onSelectRequest={setSelectedRequest} onClearTraffic={handleClearTraffic} />;
-      // --- Add cases for Recon, Crawler, Spider as they are built out ---
-      // case 'replay_forge':
-      //   return <ReplayForge initialRequest={selectedRequest} />; // Example
-      default:
-        return <Dashboard proxyStatus={proxyStatus} onStartProxy={handleStartProxy} onStopProxy={handleStopProxy} trafficCount={traffic.length} />;
-    }
-  };
-
-  return (
-    <div className="flex h-screen bg-gray-900 text-white">
-      <Sidebar
-        currentView={currentView}
-        onViewChange={setCurrentView}
-        proxyStatus={proxyStatus}
-        trafficCount={traffic.length}
-      />
-      <main className="flex-1 overflow-hidden bg-gray-800">
-        {renderCurrentView()}
-      </main>
-    </div>
-  );
-};
+export const proxyManager = new ProxyManager();
