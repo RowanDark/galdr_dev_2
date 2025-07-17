@@ -24,6 +24,7 @@ def create_api_app(proxy_engine: EnhancedProxyEngine, db_manager: DatabaseManage
     # This allows the proxy to broadcast events without being coupled to FastAPI.
     sio, sio_app = WebSocketManager.create_socketio_app()
     proxy_engine.set_websocket_manager(sio)
+    app.state.sio = sio
 
     # Mount the Socket.IO app
     app.mount('/socket.io', sio_app)
