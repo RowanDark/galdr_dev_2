@@ -1,6 +1,7 @@
 // galdr/interceptor/frontend/src/renderer/App.tsx
 // --- FINALIZED & CORRECTED ---
-// This version properly handles the state transfer to ReplayForge, completing the workflow.
+// This version has the correct component structure and handles state transfer
+// for both Replay Forge and Raider.
 
 import React, { useState, useEffect } from 'react';
 
@@ -17,20 +18,23 @@ import { proxyManager } from './services/ProxyManager';
 
 // Types
 import { InterceptedTraffic, ProxyStatus } from './types/traffic';
-
+import { SendRequestData } from './services/ReplayForgeManager'; // Raider will use this type
 
 // This type definition now includes all our planned modules for type safety.
 type ViewType = 'dashboard' | 'traffic' | 'recon' | 'crawler' | 'spider' | 'replay_forge' | 'raider' | 'mirror' | 'entropy' | 'cipher' | 'accomplice' | 'portal' | 'config';
 
 export const App: React.FC = () => {
+  // --- STATE MANAGEMENT ---
   const [currentView, setCurrentView] = useState<ViewType>('dashboard');
   const [traffic, setTraffic] = useState<InterceptedTraffic[]>([]);
   const [selectedRequest, setSelectedRequest] = useState<InterceptedTraffic | null>(null);
   const [proxyStatus, setProxyStatus] = useState<ProxyStatus>('stopped');
   
-  // NEW: This state holds the request data while we switch views to Replay Forge.
-  const [requestToSend, setRequestToSend] = useState<any | null>(null);
+  // State for passing data to other modules when switching views
+  const [requestForReplay, setRequestForReplay] = useState<any | null>(null);
+  const [requestForRaider, setRequestForRaider] = useState<any | null>(null);
 
+  // --- LIFECYCLE HOOKS ---
   useEffect(() => {
     // Setup event listeners for the proxy service
     proxyManager.onStatusUpdate = (status) => setProxyStatus(status);
@@ -49,7 +53,18 @@ export const App: React.FC = () => {
     };
   }, []); // Empty dependency array ensures this effect runs only once.
 
-  // --- Handlers for App-level Actions ---
+  // Effects to 'consume' the request data once the view switches away
+  useEffect(() => {
+      if(currentView !== 'replay_forge' && requestForReplay !== null) {
+          setRequestForReplay(null);
+      }
+      if(currentView !== 'raider' && requestForRaider !== null) {
+          setRequestForRaider(null);
+      }
+  }, [currentView, requestForReplay, requestForRaider])
+
+
+  // --- EVENT HANDLERS ---
   const handleStartProxy = () => proxyManager.startProxy().catch(console.error);
   const handleStopProxy = () => proxyManager.stopProxy().catch(console.error);
   const handleClearTraffic = async () => {
@@ -57,9 +72,7 @@ export const App: React.FC = () => {
     setTraffic([]);
     setSelectedRequest(null);
   };
-
-  // NEW: This is the core logic for the workflow.
-  // It receives the request from TrafficViewer, formats it, sets it in state, and switches the view.
+  
   const handleSendToReplayForge = (trafficItem: InterceptedTraffic) => {
     const replayRequestData = {
       method: trafficItem.method,
@@ -67,19 +80,17 @@ export const App: React.FC = () => {
       headers: JSON.parse(trafficItem.request_headers || '{}'),
       body: trafficItem.request_body || '',
     };
-    setRequestToSend(replayRequestData);
+    setRequestForReplay(replayRequestData);
     setCurrentView('replay_forge');
   };
   
-  // This effect ensures that once a request is passed to Replay Forge, it's 'consumed'
-  // so it isn't sent again if the user just switches back to the view.
-  useEffect(() => {
-      if(currentView !== 'replay_forge' && requestToSend !== null) {
-          setRequestToSend(null);
-      }
-  }, [currentView, requestToSend])
+  // Correctly defined handler for sending data to Raider
+  const handleSendToRaider = (requestData: SendRequestData) => {
+      setRequestForRaider(requestData);
+      setCurrentView('raider');
+  };
 
-
+  // --- VIEW RENDERER ---
   const renderCurrentView = () => {
     switch (currentView) {
       case 'dashboard':
@@ -91,29 +102,22 @@ export const App: React.FC = () => {
             selectedRequest={selectedRequest}
             onSelectRequest={setSelectedRequest}
             onClearTraffic={handleClearTraffic}
-            onSendToReplayForge={handleSendToReplayForge} // Pass the handler down
+            onSendToReplayForge={handleSendToReplayForge}
           />
         );
       case 'replay_forge':
-        // The ReplayForge component receives the request data via props.
-        return <ReplayForge initialRequest={requestToSend} />;
-     
+        return <ReplayForge initialRequest={requestForReplay} onSendToRaider={handleSendToRaider} />;
       case 'portal':
         return <Portal />;
-
-      // ADD THIS CASE
       case 'raider':
-        return <Raider />;
-        
+        return <Raider initialRequest={requestForRaider} />;
+      // Default case for any views not yet implemented.
       default:
-      
-      // We will add other views here as we build them.
-      
-      default:
-        return <p>View not yet implemented: {currentView}</p>;
+        return <div className="p-4"><p>View not yet implemented: {currentView}</p></div>;
     }
   };
 
+  // --- MAIN COMPONENT RENDER ---
   return (
     <div className="flex h-screen bg-gray-900 text-white">
       <Sidebar
