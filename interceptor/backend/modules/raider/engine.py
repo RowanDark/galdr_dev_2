@@ -15,18 +15,16 @@ class RaiderEngine:
         # We can reuse the HTTP client from Replay Forge for sending requests.
         self.http_client = ReplayHttpClient()
         self.active_attacks: Dict[str, asyncio.Task] = {}
+        self.sio = sio
 
     def _prepare_request(self, template: dict, payload: str) -> dict:
-        """Injects the payload into the request template."""
-        # This is a simple implementation that replaces a marker.
-        # It can be made more sophisticated to handle multiple payload positions.
         template_str = json.dumps(template)
         # We'll use a simple marker for payloads: §payload§
         injected_str = template_str.replace("§payload§", json.dumps(payload)[1:-1]) # Handle JSON string escaping
         return json.loads(injected_str)
 
     async def _run_attack_loop(self, attack_id: str, attack_config: dict, base_request: dict, payload_list: List[str]):
-        """The main asynchronous loop that executes the attack."""
+        """The main asynchronous loop that executes the attack and emits live results."""
         session = self.db.get_session()
         request_counter = 0
 
@@ -54,12 +52,39 @@ class RaiderEngine:
             )
             session.add(result)
             request_counter += 1
-
-            # Commit in batches for performance
+             # NEW: Emit the live result over WebSocket.
+            if self.sio:
+                result_data = {
+                    "attack_id": result.attack_id,
+                    "request_number": result.request_number,
+                    "payload": result.payload_value,
+                    "status": result.status_code,
+                    "length": result.response_length,
+                    "duration": result.response_time_ms,
+                    }
+                    # The room will be the attack_id, so only interested clients get updates.
+                await self.sio.emit('raider_result_update', result_data, room=attack_id)
+                
             if request_counter % 100 == 0:
                 session.commit()
-        
-        session.commit() # Commit any remaining results
+            
+            session.commit()
+        except asyncio.CancelledError:
+            self.logger.info(f"Attack {attack_id} loop was cancelled.")
+            session.rollback() # Rollback partial commits if cancelled
+        finally:
+            attack_record = session.query(RaiderAttack).filter_by(id=attack_id).first()
+            if attack_record and attack_id in self.active_attacks:
+                attack_record.status = "completed"
+                if self.sio: await self.sio.emit('raider_attack_status', {'status': 'completed', 'attack_id': attack_id}, room=attack_id)
+
+            session.commit()
+            session.close()
+            self.logger.info(f"Attack {attack_id} loop finished with {request_counter} requests.")
+            if attack_id in self.active_attacks:
+                del self.active_attacks[attack_id]
+
+
         
         # Mark attack as completed
         attack_record = session.query(RaiderAttack).filter_by(id=attack_id).first()
