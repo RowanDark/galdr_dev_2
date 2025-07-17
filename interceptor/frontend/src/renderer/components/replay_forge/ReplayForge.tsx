@@ -3,7 +3,7 @@
 // This version integrates a dedicated "Portal AI Analysis" panel.
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Send, Plus, Loader, Layers, BrainCircuit, ChevronUp, ChevronDown, Sparkles } from 'lucide-react';
+import { Send, Plus, Loader, Layers, BrainCircuit, ChevronUp, ChevronDown, Sparkles, Bug } from 'lucide-react';
 
 // Services & Child Components
 import { replayForgeManager, ReplayTab, ReplayResult, SendRequestData } from '../../services/ReplayForgeManager';
@@ -18,6 +18,7 @@ import ReactMarkdown from 'react-markdown';
 
 interface ReplayForgeProps {
   initialRequest?: any;
+  onSendToRaider: (request: SendRequestData) => void;
 }
 
 export const ReplayForge: React.FC<ReplayForgeProps> = ({ initialRequest }) => {
@@ -91,6 +92,7 @@ export const ReplayForge: React.FC<ReplayForgeProps> = ({ initialRequest }) => {
       
       {activeRequest ? (
         <div className="flex-1 grid grid-cols-2 gap-px bg-gray-700 overflow-hidden">
+          
             <div className="flex flex-col">
               <RequestEditor request={activeRequest} onUpdateRequest={handleRequestUpdate} />
               <button onClick={handleSend} disabled={isActivelyLoading} className="flex justify-center items-center gap-2 p-2 bg-blue-600 rounded-none font-bold hover:bg-blue-500 disabled:bg-gray-500">
@@ -98,7 +100,27 @@ export const ReplayForge: React.FC<ReplayForgeProps> = ({ initialRequest }) => {
                   <span>Send</span>
               </button>
             </div>
-            
+            {/* Request Pane */}
+            <div className="flex flex-col">
+                <div className="p-2 bg-gray-900 flex justify-between items-center">
+                    <h2 className="text-base font-bold">Request</h2>
+                    <div className="flex items-center gap-2">
+                        {/* NEW BUTTON */}
+                        <button 
+                          onClick={() => activeRequest && onSendToRaider(activeRequest)} 
+                          disabled={!activeRequest}
+                          className="flex items-center gap-2 px-3 py-1 bg-red-600 rounded text-white font-semibold text-sm hover:bg-red-500 disabled:bg-gray-600"
+                          title="Send request to Raider for automated attacks"
+                        >
+                            <Bug size={16} />
+                            <span>Raider</span>
+                        </button>
+                        <button onClick={handleSend} disabled={isActivelyLoading} className="flex justify-center items-center gap-2 px-3 py-1 bg-blue-600 rounded font-bold text-sm hover:bg-blue-500 disabled:bg-gray-500">
+                            {isActivelyLoading ? <Loader size={16} className="animate-spin" /> : <Send size={16} />}
+                            <span>Send</span>
+                        </button>
+                    </div>
+                </div>
             <div className={`flex flex-col transition-all duration-300 ${isAnalysisPanelOpen ? 'h-full' : 'h-auto'}`}>
                 <ResponseViewer response={activeResponse} isLoading={isActivelyLoading} />
                 
